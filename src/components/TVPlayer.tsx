@@ -208,19 +208,16 @@ function getBrasiliaTimeParts(): { dayIndex: number; timeStr: string } {
   }
 }
 
-function isScheduledOff(screenDoc: any): boolean {
-  // Use device LOCAL time instead of UTC or fixed Brasilia timezone
-  const now = new Date();
-  const dayIndex = now.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
-  const hours = now.getHours();
-  const minutes = now.getMinutes();
-  const currentTimeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+function isScheduledOff(doc: any, useDefaultFallback: boolean = false): boolean {
+  if (!doc) return false;
 
-  // 1. If screenDoc has a custom schedule configured in Firestore, respect it
-  if (screenDoc && screenDoc.schedule) {
+  const { dayIndex, timeStr: currentTimeStr } = getBrasiliaTimeParts();
+
+  // 1. If doc has a custom schedule configured in Firestore, respect it
+  if (doc.schedule && Object.keys(doc.schedule).length > 0) {
     const daysKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const dayKey = daysKeys[dayIndex];
-    const dayConfig = screenDoc.schedule[dayKey];
+    const dayConfig = doc.schedule[dayKey];
     if (dayConfig && dayConfig.enabled) {
       const { startTime, endTime } = dayConfig;
       if (startTime && endTime) {
@@ -231,9 +228,15 @@ function isScheduledOff(screenDoc: any): boolean {
         }
       }
     }
+    // If schedule is configured but disabled or not set for today, it is NOT off.
+    return false;
   }
 
-  // 2. Default weekly schedule:
+  // 2. Default weekly schedule (only for screen fallback if useDefaultFallback is true):
+  if (!useDefaultFallback) {
+    return false;
+  }
+
   // • Segunda a sexta (1 to 5) → ativo 07h00 às 22h00
   // • Sábado (6) → ativo 08h00 às 20h00
   // • Domingo (0) → ativo 09h00 às 18h00
@@ -262,9 +265,9 @@ export default function TVPlayer() {
 
   useEffect(() => {
     const checkSchedule = () => {
-      const screenOff = isScheduledOff(screenDoc);
+      const screenOff = isScheduledOff(screenDoc, true);
       const playlistOff = (screenDoc?.contentType === 'playlist' && activePlaylistDoc)
-        ? isScheduledOff(activePlaylistDoc)
+        ? isScheduledOff(activePlaylistDoc, false)
         : false;
       setIsOffBySchedule(screenOff || playlistOff);
     };
@@ -765,6 +768,10 @@ export default function TVPlayer() {
     if (playlistItems.length === 0) return;
 
     const activeItem = playlistItems[playlistIndex];
+    if (!activeItem) {
+      setPlaylistIndex(0);
+      return;
+    }
     setActiveAsset(activeItem);
 
     const nextIndex = (playlistIndex + 1) % playlistItems.length;
