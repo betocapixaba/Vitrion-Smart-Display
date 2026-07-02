@@ -209,7 +209,12 @@ function getBrasiliaTimeParts(): { dayIndex: number; timeStr: string } {
 }
 
 function isScheduledOff(screenDoc: any): boolean {
-  const { dayIndex, timeStr: currentTimeStr } = getBrasiliaTimeParts();
+  // Use device LOCAL time instead of UTC or fixed Brasilia timezone
+  const now = new Date();
+  const dayIndex = now.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const currentTimeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 
   // 1. If screenDoc has a custom schedule configured in Firestore, respect it
   if (screenDoc && screenDoc.schedule) {
@@ -228,22 +233,22 @@ function isScheduledOff(screenDoc: any): boolean {
     }
   }
 
-  // 2. Default hardcoded fallback schedule as requested in Bloco 3:
-  // • Segunda a sexta (1 to 5) -> ativo 07h00 às 22h00
-  // • Sábado (6) -> ativo 08h00 às 20h00
-  // • Domingo (0) -> ativo 09h00 às 18h00
-  let activeStart = "07:00";
-  let activeEnd = "22:00";
+  // 2. Default weekly schedule:
+  // • Segunda a quinta (1 to 4) → ativo 05h00 às 21h30
+  // • Sábado e Sexta (5 and 6) → ativo 05h00 às 23h00
+  // • Domingo (0) → ativo 07h00 às 23h00
+  let activeStart = "05:00";
+  let activeEnd = "21:30";
 
-  if (dayIndex === 0) { // Domingo
-    activeStart = "09:00";
-    activeEnd = "18:00";
-  } else if (dayIndex === 6) { // Sábado
-    activeStart = "08:00";
-    activeEnd = "20:00";
-  } else { // Segunda a Sexta (ou Segunda a Quinta se configurado na TV)
+  if (dayIndex >= 1 && dayIndex <= 4) { // Segunda a Quinta
+    activeStart = "05:00";
+    activeEnd = "21:30";
+  } else if (dayIndex === 5 || dayIndex === 6) { // Sexta e Sábado
+    activeStart = "05:00";
+    activeEnd = "23:00";
+  } else if (dayIndex === 0) { // Domingo
     activeStart = "07:00";
-    activeEnd = "22:00";
+    activeEnd = "23:00";
   }
 
   return currentTimeStr < activeStart || currentTimeStr >= activeEnd;
@@ -265,7 +270,7 @@ export default function TVPlayer() {
     };
 
     checkSchedule();
-    const interval = setInterval(checkSchedule, 5000); // Check every 5 seconds
+    const interval = setInterval(checkSchedule, 30000); // Check every 30 seconds as requested
     return () => clearInterval(interval);
   }, [screenDoc, activePlaylistDoc]);
   const [activeAsset, setActiveAsset] = useState<any>(null);
@@ -287,6 +292,7 @@ export default function TVPlayer() {
   const wakeLockRef = useRef<any>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Screen Wake Lock API actions
   const requestWakeLock = async () => {
@@ -426,6 +432,60 @@ export default function TVPlayer() {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Synchronize video tag play/pause based on active schedule state
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (isOffBySchedule) {
+      console.log("Weekly Schedule OFF: Pausing loop video immediately.");
+      video.pause();
+    } else {
+      console.log("Weekly Schedule ON: Starting loop video playback.");
+      video.play().catch((err) => console.warn("Watchdog error playing video on schedule active:", err));
+    }
+  }, [isOffBySchedule, activeAsset]);
+
+  // Video playback watchdog (runs every 4 seconds to catch crashes/pauses in under 5 seconds)
+  useEffect(() => {
+    let lastTime = -1;
+    let stuckCount = 0;
+
+    const checkVideoPlayback = () => {
+      const video = videoRef.current;
+      if (!video || isOffBySchedule) return;
+
+      // Ensure loop and playsInline are always active
+      if (!video.loop) video.loop = true;
+
+      // If paused or ended unexpectedly during active hours, restart from beginning
+      if (video.paused || video.ended) {
+        console.warn("Watchdog: Video was paused or ended unexpectedly. Restarting from beginning...");
+        video.currentTime = 0;
+        video.play().catch((err) => console.warn("Watchdog recovery play failed:", err));
+        return;
+      }
+
+      // Check for stuck/frozen playback (currentTime not changing)
+      const currentTime = video.currentTime;
+      if (currentTime === lastTime) {
+        stuckCount++;
+        if (stuckCount >= 1) { // Stuck for 4 seconds
+          console.warn("Watchdog: Video frame is frozen/stuck. Resetting video player...");
+          video.currentTime = 0;
+          video.play().catch((err) => console.warn("Watchdog recovery play failed:", err));
+          stuckCount = 0;
+        }
+      } else {
+        stuckCount = 0;
+      }
+      lastTime = currentTime;
+    };
+
+    const intervalId = setInterval(checkVideoPlayback, 4000);
+    return () => clearInterval(intervalId);
+  }, [isOffBySchedule, activeAsset]);
 
   // Initialization: check localstorage and cookies for paired credentials, or create a brand new unauthenticated screen code
   useEffect(() => {
@@ -1196,12 +1256,17 @@ export default function TVPlayer() {
 
             {/* 3. VIDEO CONTENT */}
             {activeAsset.type === 'video' && (
-              <div className="w-full h-full relative bg-black">
+              <div 
+                className="w-full h-full relative bg-black" 
+                style={{ display: isOffBySchedule ? 'none' : 'block' }}
+              >
                 <video 
+                  ref={videoRef}
                   src={activeAsset.url} 
                   muted 
                   loop 
                   autoPlay 
+                  playsInline
                   className="w-full h-full object-cover" 
                 />
               </div>
