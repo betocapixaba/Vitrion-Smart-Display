@@ -265,11 +265,23 @@ export default function TVPlayer() {
 
   useEffect(() => {
     const checkSchedule = () => {
-      const screenOff = isScheduledOff(screenDoc, true);
-      const playlistOff = (screenDoc?.contentType === 'playlist' && activePlaylistDoc)
-        ? isScheduledOff(activePlaylistDoc, false)
-        : false;
-      setIsOffBySchedule(screenOff || playlistOff);
+      const hasScreenSchedule = screenDoc?.schedule && Object.keys(screenDoc.schedule).length > 0;
+      const isPlaylistMode = screenDoc?.contentType === 'playlist';
+      const hasPlaylistSchedule = isPlaylistMode && activePlaylistDoc?.schedule && Object.keys(activePlaylistDoc.schedule).length > 0;
+
+      let off = false;
+      if (hasScreenSchedule) {
+        // If the screen has a custom schedule configured, respect only it
+        off = isScheduledOff(screenDoc, false);
+      } else if (hasPlaylistSchedule) {
+        // If the screen has no custom schedule, but the playlist does, respect only the playlist's schedule
+        off = isScheduledOff(activePlaylistDoc, false);
+      } else {
+        // Fallback to the default weekly schedule if neither has a custom schedule
+        off = isScheduledOff(screenDoc, true);
+      }
+
+      setIsOffBySchedule(off);
     };
 
     checkSchedule();
@@ -724,6 +736,10 @@ export default function TVPlayer() {
     if (contentType === 'asset') {
       setActivePlaylistDoc(null);
       setPlaylistItems([]);
+      if (!contentId) {
+        setActiveAsset(null);
+        return;
+      }
       // Pull single asset document real-time
       const assetRef = doc(db, 'assets', contentId);
       const unsubAsset = onSnapshot(assetRef, (snap) => {
@@ -739,6 +755,12 @@ export default function TVPlayer() {
     }
 
     if (contentType === 'playlist') {
+      if (!contentId) {
+        setActivePlaylistDoc(null);
+        setPlaylistItems([]);
+        setActiveAsset(null);
+        return;
+      }
       // Pull playlist document real-time
       const playlistRef = doc(db, 'playlists', contentId);
       const unsubPlaylist = onSnapshot(playlistRef, (snap) => {
@@ -1216,7 +1238,7 @@ export default function TVPlayer() {
           </motion.div>
         ) : (
           <motion.div
-            key={activeAsset.id || activeAsset.name || playlistIndex}
+            key={activeAsset.assetId || activeAsset.id || activeAsset.name || playlistIndex}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
