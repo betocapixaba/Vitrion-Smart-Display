@@ -94,7 +94,7 @@ function getBrasiliaTimeParts(): { dayIndex: number; timeStr: string } {
 }
 
 function isScheduledOff(screenDoc: any): boolean {
-  if (!screenDoc || !screenDoc.schedule) return false;
+  if (!screenDoc || !screenDoc.schedule || Object.keys(screenDoc.schedule).length === 0) return false;
 
   const { dayIndex, timeStr: currentTimeStr } = getBrasiliaTimeParts();
   const daysKeys = [
@@ -110,11 +110,11 @@ function isScheduledOff(screenDoc: any): boolean {
 
   const dayConfig = screenDoc.schedule[dayKey];
   if (!dayConfig || !dayConfig.enabled) {
-    return false; // If disabled or not set for this day, don't show black screen
+    return true; // If disabled or not set for this day, it is OFF (shows black screen)
   }
 
   const { startTime, endTime } = dayConfig;
-  if (!startTime || !endTime) return false;
+  if (!startTime || !endTime) return true;
 
   if (startTime <= endTime) {
     return currentTimeStr < startTime || currentTimeStr >= endTime;
