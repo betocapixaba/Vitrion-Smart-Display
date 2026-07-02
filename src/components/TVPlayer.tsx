@@ -234,21 +234,21 @@ function isScheduledOff(screenDoc: any): boolean {
   }
 
   // 2. Default weekly schedule:
-  // • Segunda a quinta (1 to 4) → ativo 05h00 às 21h30
-  // • Sábado e Sexta (5 and 6) → ativo 05h00 às 23h00
-  // • Domingo (0) → ativo 07h00 às 23h00
-  let activeStart = "05:00";
-  let activeEnd = "21:30";
+  // • Segunda a sexta (1 to 5) → ativo 07h00 às 22h00
+  // • Sábado (6) → ativo 08h00 às 20h00
+  // • Domingo (0) → ativo 09h00 às 18h00
+  let activeStart = "07:00";
+  let activeEnd = "22:00";
 
-  if (dayIndex >= 1 && dayIndex <= 4) { // Segunda a Quinta
-    activeStart = "05:00";
-    activeEnd = "21:30";
-  } else if (dayIndex === 5 || dayIndex === 6) { // Sexta e Sábado
-    activeStart = "05:00";
-    activeEnd = "23:00";
-  } else if (dayIndex === 0) { // Domingo
+  if (dayIndex >= 1 && dayIndex <= 5) { // Segunda a Sexta
     activeStart = "07:00";
-    activeEnd = "23:00";
+    activeEnd = "22:00";
+  } else if (dayIndex === 6) { // Sábado
+    activeStart = "08:00";
+    activeEnd = "20:00";
+  } else if (dayIndex === 0) { // Domingo
+    activeStart = "09:00";
+    activeEnd = "18:00";
   }
 
   return currentTimeStr < activeStart || currentTimeStr >= activeEnd;
@@ -720,6 +720,7 @@ export default function TVPlayer() {
 
     if (contentType === 'asset') {
       setActivePlaylistDoc(null);
+      setPlaylistItems([]);
       // Pull single asset document real-time
       const assetRef = doc(db, 'assets', contentId);
       const unsubAsset = onSnapshot(assetRef, (snap) => {
