@@ -228,8 +228,10 @@ function isScheduledOff(doc: any, useDefaultFallback: boolean = false): boolean 
         }
       }
     }
-    // If schedule is configured but disabled or not set for today, then the screen/playlist is OFF (shows black screen)
-    return true;
+    // If schedule is configured but disabled or not set for today, only return false if NOT using default fallback
+    if (!useDefaultFallback) {
+      return false;
+    }
   }
 
   // 2. Default weekly schedule (only for screen fallback if useDefaultFallback is true):
@@ -265,16 +267,20 @@ export default function TVPlayer() {
 
   useEffect(() => {
     const checkSchedule = () => {
-      const hasScreenSchedule = screenDoc?.schedule && Object.keys(screenDoc.schedule).length > 0;
+      const { dayIndex } = getBrasiliaTimeParts();
+      const daysKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const dayKey = daysKeys[dayIndex];
+
+      const hasScreenScheduleToday = screenDoc?.schedule?.[dayKey]?.enabled === true;
       const isPlaylistMode = screenDoc?.contentType === 'playlist';
-      const hasPlaylistSchedule = isPlaylistMode && activePlaylistDoc?.schedule && Object.keys(activePlaylistDoc.schedule).length > 0;
+      const hasPlaylistScheduleToday = isPlaylistMode && activePlaylistDoc?.schedule?.[dayKey]?.enabled === true;
 
       let off = false;
-      if (hasScreenSchedule) {
-        // If the screen has a custom schedule configured, respect only it
+      if (hasScreenScheduleToday) {
+        // If the screen has a custom schedule configured for today, respect it
         off = isScheduledOff(screenDoc, false);
-      } else if (hasPlaylistSchedule) {
-        // If the screen has no custom schedule, but the playlist does, respect only the playlist's schedule
+      } else if (hasPlaylistScheduleToday) {
+        // If the screen has no custom schedule today, but the playlist does, respect the playlist's schedule today
         off = isScheduledOff(activePlaylistDoc, false);
       } else {
         // Fallback to the default weekly schedule today
@@ -788,7 +794,6 @@ export default function TVPlayer() {
   // Loop timer for Playlist sequences
   useEffect(() => {
     if (playlistItems.length === 0) return;
-    if (isOffBySchedule) return;
 
     const activeItem = playlistItems[playlistIndex];
     if (!activeItem) {
@@ -805,7 +810,7 @@ export default function TVPlayer() {
     }, itemDurationMs);
 
     return () => clearTimeout(timeoutId);
-  }, [playlistItems, playlistIndex, isOffBySchedule]);
+  }, [playlistItems, playlistIndex]);
 
   // Toggle Fullscreen view helper
   const handleToggleFullscreen = () => {
