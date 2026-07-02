@@ -168,7 +168,7 @@ function removeStoredScreenId() {
 function getBrasiliaTimeParts(): { dayIndex: number; timeStr: string } {
   try {
     const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/New_York',
+      timeZone: 'America/Sao_Paulo',
       weekday: 'short',
       hour: '2-digit',
       minute: '2-digit',
@@ -228,8 +228,10 @@ function isScheduledOff(doc: any, useDefaultFallback: boolean = false): boolean 
         }
       }
     }
-    // If schedule is configured but disabled or not set for today, it is NOT off.
-    return false;
+    // If schedule is configured but disabled or not set for today, only return false if NOT using default fallback
+    if (!useDefaultFallback) {
+      return false;
+    }
   }
 
   // 2. Default weekly schedule (only for screen fallback if useDefaultFallback is true):
@@ -265,19 +267,23 @@ export default function TVPlayer() {
 
   useEffect(() => {
     const checkSchedule = () => {
-      const hasScreenSchedule = screenDoc?.schedule && Object.keys(screenDoc.schedule).length > 0;
+      const { dayIndex } = getBrasiliaTimeParts();
+      const daysKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const dayKey = daysKeys[dayIndex];
+
+      const hasScreenScheduleToday = screenDoc?.schedule?.[dayKey]?.enabled === true;
       const isPlaylistMode = screenDoc?.contentType === 'playlist';
-      const hasPlaylistSchedule = isPlaylistMode && activePlaylistDoc?.schedule && Object.keys(activePlaylistDoc.schedule).length > 0;
+      const hasPlaylistScheduleToday = isPlaylistMode && activePlaylistDoc?.schedule?.[dayKey]?.enabled === true;
 
       let off = false;
-      if (hasScreenSchedule) {
-        // If the screen has a custom schedule configured, respect only it
+      if (hasScreenScheduleToday) {
+        // If the screen has a custom schedule configured for today, respect it
         off = isScheduledOff(screenDoc, false);
-      } else if (hasPlaylistSchedule) {
-        // If the screen has no custom schedule, but the playlist does, respect only the playlist's schedule
+      } else if (hasPlaylistScheduleToday) {
+        // If the screen has no custom schedule today, but the playlist does, respect the playlist's schedule today
         off = isScheduledOff(activePlaylistDoc, false);
       } else {
-        // Fallback to the default weekly schedule if neither has a custom schedule
+        // Fallback to the default weekly schedule today
         off = isScheduledOff(screenDoc, true);
       }
 
@@ -433,7 +439,7 @@ export default function TVPlayer() {
     const tick = () => {
       try {
         const timeStr = new Date().toLocaleTimeString('pt-BR', {
-          timeZone: 'America/New_York',
+          timeZone: 'America/Sao_Paulo',
           hour: '2-digit',
           minute: '2-digit'
         });
@@ -1135,7 +1141,7 @@ export default function TVPlayer() {
           <p>Plataforma para gerenciamento de mídia dinâmica no varejo e escritórios.</p>
           <div className="flex items-center gap-1 font-mono mt-2 sm:mt-0 font-bold">
             <Clock className="w-3.5 h-3.5 mt-0.5" />
-            <span>{realtimeClock} • NEW YORK</span>
+            <span>{realtimeClock} • BRASÍLIA</span>
           </div>
         </footer>
       </div>

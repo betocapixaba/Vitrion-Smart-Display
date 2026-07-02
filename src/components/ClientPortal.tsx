@@ -105,7 +105,7 @@ function generateDisplayCode(): string {
 function getBrasiliaTimeParts(): { dayIndex: number; timeStr: string } {
   try {
     const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/New_York',
+      timeZone: 'America/Sao_Paulo',
       weekday: 'short',
       hour: '2-digit',
       minute: '2-digit',
