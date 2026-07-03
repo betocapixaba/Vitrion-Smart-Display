@@ -94,34 +94,58 @@ function getBrasiliaTimeParts(): { dayIndex: number; timeStr: string } {
 }
 
 function isScheduledOff(screenDoc: any): boolean {
-  if (!screenDoc || !screenDoc.schedule || Object.keys(screenDoc.schedule).length === 0) return false;
+  if (!screenDoc) return false;
 
   const { dayIndex, timeStr: currentTimeStr } = getBrasiliaTimeParts();
-  const daysKeys = [
-    "sunday",
-    "monday",
-    "tuesday",
-    "wednesday",
-    "thursday",
-    "friday",
-    "saturday",
-  ];
-  const dayKey = daysKeys[dayIndex];
 
-  const dayConfig = screenDoc.schedule[dayKey];
-  if (!dayConfig || !dayConfig.enabled) {
-    return true; // If disabled or not set for this day, it is OFF (shows black screen)
+  // A schedule is considered valid/active if at least one day is enabled
+  const hasActiveSchedule = screenDoc.schedule && Object.values(screenDoc.schedule).some((day: any) => day?.enabled === true);
+
+  if (hasActiveSchedule) {
+    const daysKeys = [
+      "sunday",
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+    ];
+    const dayKey = daysKeys[dayIndex];
+    const dayConfig = screenDoc.schedule[dayKey];
+    if (dayConfig && dayConfig.enabled) {
+      const { startTime, endTime } = dayConfig;
+      if (startTime && endTime) {
+        if (startTime <= endTime) {
+          return currentTimeStr < startTime || currentTimeStr >= endTime;
+        } else {
+          return currentTimeStr >= endTime && currentTimeStr < startTime;
+        }
+      }
+    }
+    // If schedule is active but disabled for today, then the screen/playlist is OFF (shows black screen)
+    return true;
   }
 
-  const { startTime, endTime } = dayConfig;
-  if (!startTime || !endTime) return true;
+  // 2. Default weekly schedule fallback:
+  // • Segunda a sexta (1 to 5) → ativo 07h00 às 22h00
+  // • Sábado (6) → ativo 08h00 às 20h00
+  // • Domingo (0) → ativo 09h00 às 18h00
+  let activeStart = "07:00";
+  let activeEnd = "22:00";
 
-  if (startTime <= endTime) {
-    return currentTimeStr < startTime || currentTimeStr >= endTime;
-  } else {
-    // Overnight schedule
-    return currentTimeStr >= endTime && currentTimeStr < startTime;
+  if (dayIndex >= 1 && dayIndex <= 5) { // Segunda a Sexta
+    activeStart = "07:00";
+    activeEnd = "22:00";
+  } else if (dayIndex === 6) { // Sábado
+    activeStart = "08:00";
+    activeEnd = "20:00";
+  } else if (dayIndex === 0) { // Domingo
+    activeStart = "09:00";
+    activeEnd = "18:00";
   }
+
+  return currentTimeStr < activeStart || currentTimeStr >= activeEnd;
 }
 
 export default function ScreenManager() {

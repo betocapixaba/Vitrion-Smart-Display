@@ -168,7 +168,7 @@ function removeStoredScreenId() {
 function getBrasiliaTimeParts(): { dayIndex: number; timeStr: string } {
   try {
     const formatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/Sao_Paulo',
+      timeZone: 'America/New_York',
       weekday: 'short',
       hour: '2-digit',
       minute: '2-digit',
@@ -213,8 +213,10 @@ function isScheduledOff(doc: any, useDefaultFallback: boolean = false): boolean 
 
   const { dayIndex, timeStr: currentTimeStr } = getBrasiliaTimeParts();
 
-  // 1. If doc has a custom schedule configured in Firestore, respect it
-  if (doc.schedule && Object.keys(doc.schedule).length > 0) {
+  // A schedule is considered valid/active if at least one day is enabled
+  const hasActiveSchedule = doc.schedule && Object.values(doc.schedule).some((day: any) => day?.enabled === true);
+
+  if (hasActiveSchedule) {
     const daysKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const dayKey = daysKeys[dayIndex];
     const dayConfig = doc.schedule[dayKey];
@@ -228,11 +230,11 @@ function isScheduledOff(doc: any, useDefaultFallback: boolean = false): boolean 
         }
       }
     }
-    // If schedule is configured but disabled or not set for today, then the screen/playlist is OFF (shows black screen)
+    // If schedule is active but disabled for today, then the screen/playlist is OFF (shows black screen)
     return true;
   }
 
-  // 2. Default weekly schedule (only for screen fallback if useDefaultFallback is true):
+  // 2. Default weekly schedule (only if useDefaultFallback is true):
   if (!useDefaultFallback) {
     return false;
   }
@@ -265,9 +267,9 @@ export default function TVPlayer() {
 
   useEffect(() => {
     const checkSchedule = () => {
-      const hasScreenSchedule = screenDoc?.schedule && Object.keys(screenDoc.schedule).length > 0;
+      const hasScreenSchedule = screenDoc?.schedule && Object.values(screenDoc.schedule).some((day: any) => day?.enabled === true);
       const isPlaylistMode = screenDoc?.contentType === 'playlist';
-      const hasPlaylistSchedule = isPlaylistMode && activePlaylistDoc?.schedule && Object.keys(activePlaylistDoc.schedule).length > 0;
+      const hasPlaylistSchedule = isPlaylistMode && activePlaylistDoc?.schedule && Object.values(activePlaylistDoc.schedule).some((day: any) => day?.enabled === true);
 
       let off = false;
       if (hasScreenSchedule) {
@@ -433,7 +435,7 @@ export default function TVPlayer() {
     const tick = () => {
       try {
         const timeStr = new Date().toLocaleTimeString('pt-BR', {
-          timeZone: 'America/Sao_Paulo',
+          timeZone: 'America/New_York',
           hour: '2-digit',
           minute: '2-digit'
         });
