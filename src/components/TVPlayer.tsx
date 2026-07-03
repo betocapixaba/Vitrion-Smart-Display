@@ -1174,23 +1174,8 @@ export default function TVPlayer() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6 text-center"
-          >
-            <div className="space-y-4">
-              <span className="text-[10px] bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 px-2.5 py-1 rounded-full font-bold uppercase tracking-widest animate-pulse">
-                Modo Standby 💤
-              </span>
-              <div className="text-5xl sm:text-6xl font-mono font-bold tracking-tight text-white animate-pulse">
-                {realtimeClock}
-              </div>
-              <p className="text-xs text-slate-500 max-w-xs uppercase tracking-widest font-mono">
-                Smart TV ativa • Aguardando programação
-              </p>
-            </div>
-            <div className="absolute bottom-8 text-center text-[8px] text-slate-600 uppercase tracking-widest font-mono">
-              Vitrion Digital Signage Screen
-            </div>
-          </motion.div>
+            className="absolute inset-0 bg-black flex flex-col items-center justify-center"
+          />
         ) : screenDoc.contentType === 'stopped' ? (
           <motion.div 
             key="stopped"

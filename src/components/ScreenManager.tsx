@@ -227,7 +227,7 @@ export default function ScreenManager() {
   const toggleClientCollapse = (clientId: string) => {
     setCollapsedClientIds((prev) => ({
       ...prev,
-      [clientId]: !prev[clientId],
+      [clientId]: prev[clientId] === false ? true : false,
     }));
   };
 
@@ -2340,12 +2340,12 @@ const safeConfirm = (message: string): boolean => {
                               onClick={() => toggleClientCollapse(client.id)}
                               className="h-8 flex items-center justify-center px-3 hover:bg-slate-150 text-slate-755 rounded-lg border border-slate-350 bg-white shadow-3xs transition cursor-pointer text-[10px] font-bold tracking-wide uppercase select-none shrink-0"
                               title={
-                                collapsedClientIds[client.id]
+                                collapsedClientIds[client.id] !== false
                                   ? "Visualizar lista de TVs"
                                   : "Recolher lista de TVs"
                               }
                             >
-                              {collapsedClientIds[client.id]
+                              {collapsedClientIds[client.id] !== false
                                 ? "Ver TVs"
                                 : "Recolher"}
                             </button>
@@ -2353,7 +2353,7 @@ const safeConfirm = (message: string): boolean => {
                         </div>
 
                         {/* List of TVs belonging to this client (Rows/Lines) */}
-                        {!collapsedClientIds[client.id] && (
+                        {collapsedClientIds[client.id] === false && (
                           <div className="p-3 bg-slate-50/25 border-t border-slate-200/70">
                             {clientScreens.length === 0 ? (
                               <p className="text-[10.5px] text-slate-400 italic py-2 text-center font-sans">

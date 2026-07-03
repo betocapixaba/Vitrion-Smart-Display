@@ -50,6 +50,7 @@ import {
   ChevronUp,
   Clock,
   Settings,
+  Pencil,
 } from "lucide-react";
 
 // Error monitoring based on firebase-integration skill
@@ -263,6 +264,11 @@ export default function ClientPortal({
   const [quickDisplayName, setQuickDisplayName] = useState("");
   const [isSubmittingQuickPair, setIsSubmittingQuickPair] = useState(false);
 
+  // Edit Screen Name States
+  const [editingScreenNameId, setEditingScreenNameId] = useState<string | null>(null);
+  const [editingScreenNameValue, setEditingScreenNameValue] = useState("");
+  const [isSavingScreenName, setIsSavingScreenName] = useState(false);
+
   // New Playlist Form States
   const [isAddPlaylistOpen, setIsAddPlaylistOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
@@ -360,6 +366,34 @@ export default function ClientPortal({
       );
     } finally {
       setSavingSchedule(null);
+    }
+  };
+
+  const handleSaveScreenName = async (screenId: string) => {
+    if (!editingScreenNameValue.trim()) {
+      setErrorMsg("O nome do display não pode ser vazio.");
+      setTimeout(() => setErrorMsg(""), 3000);
+      return;
+    }
+    setIsSavingScreenName(true);
+    try {
+      const docRef = doc(db, "screens", screenId);
+      await updateDoc(docRef, {
+        name: editingScreenNameValue.trim(),
+        updatedAt: serverTimestamp(),
+      });
+      setSuccessMsg("Nome do display atualizado com sucesso!");
+      setEditingScreenNameId(null);
+      setTimeout(() => setSuccessMsg(""), 2000);
+    } catch (err) {
+      console.error("Error saving screen name:", err);
+      handleLocalFirestoreError(
+        err,
+        OperationType.UPDATE,
+        `screens/${screenId}`,
+      );
+    } finally {
+      setIsSavingScreenName(false);
     }
   };
 
@@ -1661,23 +1695,71 @@ const safeConfirm = (message: string): boolean => {
 
                       <div className="flex items-start justify-between gap-4">
                         <div className="space-y-1 pl-1">
-                          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                            {screen.name}
-                            <span className="relative flex h-2 w-2 shrink-0">
-                              <span
-                                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${screen.status === "online" ? "bg-emerald-400" : "bg-slate-500"}`}
-                              ></span>
-                              <span
-                                className={`relative inline-flex rounded-full h-2 w-2 ${screen.status === "online" ? "bg-emerald-500" : "bg-slate-500"}`}
-                              ></span>
-                            </span>
-                            {isScheduledOff(screen) && (
-                              <span className="inline-flex items-center gap-1.5 text-[9px] font-extrabold bg-amber-500/10 border border-amber-500/25 text-amber-400 px-2 py-0.5 rounded-full select-none ml-1 animate-pulse">
-                                <Clock className="w-2.5 h-2.5 text-amber-500" />
-                                TIMER ATIVO (TELA PRETA)
+                          {editingScreenNameId === screen.id ? (
+                            <div className="flex items-center gap-1.5 animate-fade-in">
+                              <input
+                                type="text"
+                                value={editingScreenNameValue}
+                                onChange={(e) => setEditingScreenNameValue(e.target.value)}
+                                className="bg-slate-900 border border-slate-750 focus:border-indigo-500 rounded px-2 py-0.5 text-xs text-white outline-none transition"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    handleSaveScreenName(screen.id);
+                                  } else if (e.key === "Escape") {
+                                    setEditingScreenNameId(null);
+                                  }
+                                }}
+                              />
+                              <button
+                                onClick={() => handleSaveScreenName(screen.id)}
+                                disabled={isSavingScreenName}
+                                className="p-1 text-emerald-400 hover:text-emerald-300 transition cursor-pointer"
+                                title="Salvar nome"
+                              >
+                                {isSavingScreenName ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Check className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                              <button
+                                onClick={() => setEditingScreenNameId(null)}
+                                className="p-1 text-slate-400 hover:text-white transition cursor-pointer"
+                                title="Cancelar"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                              <span>{screen.name}</span>
+                              <button
+                                onClick={() => {
+                                  setEditingScreenNameId(screen.id);
+                                  setEditingScreenNameValue(screen.name);
+                                }}
+                                className="p-1 text-slate-500 hover:text-white transition cursor-pointer"
+                                title="Editar nome do display"
+                              >
+                                <Pencil className="w-3 h-3 opacity-60 hover:opacity-100" />
+                              </button>
+                              <span className="relative flex h-2 w-2 shrink-0">
+                                <span
+                                  className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${screen.status === "online" ? "bg-emerald-400" : "bg-slate-500"}`}
+                                ></span>
+                                <span
+                                  className={`relative inline-flex rounded-full h-2 w-2 ${screen.status === "online" ? "bg-emerald-500" : "bg-slate-500"}`}
+                                ></span>
                               </span>
-                            )}
-                          </h3>
+                              {isScheduledOff(screen) && (
+                                <span className="inline-flex items-center gap-1.5 text-[9px] font-extrabold bg-amber-500/10 border border-amber-500/25 text-amber-400 px-2 py-0.5 rounded-full select-none ml-1 animate-pulse">
+                                  <Clock className="w-2.5 h-2.5 text-amber-500" />
+                                  TIMER ATIVO (TELA PRETA)
+                                </span>
+                              )}
+                            </h3>
+                          )}
 
                           <div className="flex flex-col gap-1.5 mt-1">
                             <div className="flex items-center gap-1 text-[11px] text-slate-400">
