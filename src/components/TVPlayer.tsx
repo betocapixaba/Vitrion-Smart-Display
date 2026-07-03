@@ -309,6 +309,7 @@ export default function TVPlayer() {
   const [wakeLockActive, setWakeLockActive] = useState(false);
   const [antiSleepSupported, setAntiSleepSupported] = useState(false);
   const wakeLockRef = useRef<any>(null);
+  const silentVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -354,21 +355,34 @@ export default function TVPlayer() {
 
   // Screen Wake Lock React lifecycle manager with auto-recovery
   useEffect(() => {
-    requestWakeLock();
+    const playSilentVideo = () => {
+      if (silentVideoRef.current) {
+        silentVideoRef.current.play().catch((err) => {
+          // Silent catch for autoplay constraints
+        });
+      }
+    };
+
+    const keepDeviceAwake = async () => {
+      await requestWakeLock();
+      playSilentVideo();
+    };
+
+    keepDeviceAwake();
 
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible') {
-        await requestWakeLock();
+        await keepDeviceAwake();
       }
     };
 
     const handleFsChangeForWakeLock = () => {
-      requestWakeLock();
+      keepDeviceAwake();
     };
 
     // Human interaction or remote control key stroke secures the wake lock state
     const handleKeepAliveInteraction = () => {
-      requestWakeLock();
+      keepDeviceAwake();
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -376,11 +390,17 @@ export default function TVPlayer() {
     window.addEventListener('mousemove', handleKeepAliveInteraction);
     window.addEventListener('keydown', handleKeepAliveInteraction);
 
+    // Keep awake watchdog: enforce wake lock and silent video playback every 15 seconds 24/7
+    const keepAliveInterval = setInterval(() => {
+      keepDeviceAwake();
+    }, 15000);
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       document.removeEventListener('fullscreenchange', handleFsChangeForWakeLock);
       window.removeEventListener('mousemove', handleKeepAliveInteraction);
       window.removeEventListener('keydown', handleKeepAliveInteraction);
+      clearInterval(keepAliveInterval);
       releaseWakeLock();
     };
   }, []);
@@ -1182,13 +1202,14 @@ export default function TVPlayer() {
       className="min-h-screen w-full bg-black flex flex-col justify-between text-white relative overflow-hidden font-sans select-none"
     >
       <video
+        ref={silentVideoRef}
         src={SILENT_VIDEO_BASE64}
         loop
         muted
         playsInline
         autoPlay
-        className="hidden pointer-events-none w-1 h-1 absolute opacity-0"
-        style={{ width: '1px', height: '1px' }}
+        className="pointer-events-none absolute w-px h-px opacity-[0.01]"
+        style={{ left: '-10px', top: '-10px', width: '1px', height: '1px' }}
       />
       {isOffBySchedule && (
         <div 
