@@ -291,6 +291,8 @@ export default function TVPlayer() {
     return () => clearInterval(interval);
   }, [screenDoc, activePlaylistDoc]);
   const [activeAsset, setActiveAsset] = useState<any>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [countdownTargetAssetId, setCountdownTargetAssetId] = useState<string | null>(null);
   const [playlistIndex, setPlaylistIndex] = useState(0);
   const [playlistItems, setPlaylistItems] = useState<PlaylistItem[]>([]);
   const [realtimeClock, setRealtimeClock] = useState('');
@@ -449,6 +451,33 @@ export default function TVPlayer() {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Initialize countdown when activeAsset is an image and is new
+  useEffect(() => {
+    if (activeAsset && activeAsset.type === 'image') {
+      const assetKey = activeAsset.id || activeAsset.url || activeAsset.assetId;
+      if (countdownTargetAssetId !== assetKey) {
+        setCountdownTargetAssetId(assetKey);
+        setCountdown(10);
+      }
+    } else {
+      setCountdown(null);
+      setCountdownTargetAssetId(null);
+    }
+  }, [activeAsset, countdownTargetAssetId]);
+
+  // Countdown clock decrement logic
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown <= 0) {
+      setCountdown(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setCountdown((prev) => (prev !== null ? prev - 1 : null));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
 
   // Synchronize video tag play/pause based on active schedule state
   useEffect(() => {
@@ -800,7 +829,8 @@ export default function TVPlayer() {
     setActiveAsset(activeItem);
 
     const nextIndex = (playlistIndex + 1) % playlistItems.length;
-    const itemDurationMs = (activeItem.duration || 10) * 1000;
+    const isImage = activeItem.type === 'image';
+    const itemDurationMs = ((activeItem.duration || 10) + (isImage ? 10 : 0)) * 1000;
 
     const timeoutId = setTimeout(() => {
       setPlaylistIndex(nextIndex);
@@ -1262,13 +1292,35 @@ export default function TVPlayer() {
 
             {/* 2. IMAGE CONTENT */}
             {activeAsset.type === 'image' && (
-              <div className="w-full h-full relative">
-                <img 
-                  src={activeAsset.url} 
-                  alt="" 
-                  className="w-full h-full object-cover" 
-                  referrerPolicy="no-referrer"
-                />
+              <div className="w-full h-full relative bg-black">
+                {countdown !== null && countdown > 0 ? (
+                  <div className="absolute inset-0 bg-black flex flex-col items-center justify-center p-6 text-center select-none z-50">
+                    <div className="space-y-6 flex flex-col items-center justify-center">
+                      <VitrionLogo variant="full" size="lg" theme="dark" className="animate-pulse" />
+                      
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <span className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">
+                          Próxima Imagem Em
+                        </span>
+                        <div className="text-8xl sm:text-9xl font-mono font-black text-white bg-white/5 border border-white/10 rounded-3xl w-32 h-32 sm:w-44 sm:h-44 flex items-center justify-center shadow-2xl tracking-tighter transition-all duration-300">
+                          {countdown}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[11px] text-indigo-400 font-mono uppercase tracking-wider animate-pulse">
+                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-ping"></span>
+                        Preparando exibição...
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <img 
+                    src={activeAsset.url} 
+                    alt="" 
+                    className="w-full h-full object-cover" 
+                    referrerPolicy="no-referrer"
+                  />
+                )}
               </div>
             )}
 
